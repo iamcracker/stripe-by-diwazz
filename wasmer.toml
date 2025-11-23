@@ -4,16 +4,20 @@ version = "0.1.0"
 description = "Stripe card checker API"
 
 [dependencies]
-"sharrattj/python" = "3.12.6"
+"python/python" = "=3.12.7"
+
+[[module]]
+name = "stripe-by-diwazz"
+source = "start.py"
+abi = "wasi"
 
 [fs]
-"/app" = "."
+"/" = "."
 
 [[command]]
-name = "run"
-module = "sharrattj/python:python"
-runner = "wasi"
+name = "script"
+module = "stripe-by-diwazz"
+runner = "https://webc.org/runner/python/python@3.12"
 
-[command.runner.wasi]
-main-args = ["/app/start.py"]
-env = ["PYTHONUNBUFFERED=1", "PORT=8000"]
+[command.annotations.wasi]
+env = ["PORT=8000"]
