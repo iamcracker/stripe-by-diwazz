@@ -15,13 +15,5 @@ module = "sharrattj/python:python"
 runner = "wasi"
 
 [command.runner.wasi]
-main-args = [
-    "-m",
-    "gunicorn",
-    "--bind=0.0.0.0:8000",
-    "--workers=1",
-    "--timeout=120",
-    "--chdir=/app",
-    "app:app"
-]
-env = ["PYTHONUNBUFFERED=1", "PYTHONPATH=/app"]
+main-args = ["/app/start.py"]
+env = ["PYTHONUNBUFFERED=1", "PORT=8000"]
