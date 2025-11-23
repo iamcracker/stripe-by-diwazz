@@ -1,0 +1,26 @@
+[package]
+name = "stripe-checker"
+version = "0.1.0"
+description = "Stripe card checker API"
+license = "MIT"
+readme = "README.md"
+
+[[module]]
+name = "script"
+source = "app.py"
+abi = "wasi"
+
+[dependencies]
+"python/python" = "^3.12"
+
+[[command]]
+name = "script"
+module = "script"
+runner = "https://webc.org/runner/wasi"
+
+[fs]
+"/app" = "."
+
+[command.annotations.wasi]
+env = ["PORT=8080"]
+main-args = ["-m", "gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
