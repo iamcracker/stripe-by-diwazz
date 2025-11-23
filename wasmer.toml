@@ -1,26 +1,26 @@
 [package]
-name = "stripe-checker"
+name = "stripe-by-diwazz"
 version = "0.1.0"
 description = "Stripe card checker API"
-license = "MIT"
-readme = "README.md"
-
-[[module]]
-name = "script"
-source = "app.py"
-abi = "wasi"
 
 [dependencies]
-"python/python" = "^3.12"
-
-[[command]]
-name = "script"
-module = "script"
-runner = "https://webc.org/runner/wasi"
+"sharrattj/python" = "3.12.6"
 
 [fs]
-"/app" = "."
+"/src" = "."
 
-[command.annotations.wasi]
-env = ["PORT=8080"]
-main-args = ["-m", "gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
+[[command]]
+name = "run"
+module = "sharrattj/python:python"
+runner = "wasi"
+
+[command.runner.wasi]
+main-args = [
+    "-m",
+    "gunicorn",
+    "--bind=0.0.0.0:8000",
+    "--workers=1",
+    "--timeout=120",
+    "app:app"
+]
+env = ["PYTHONUNBUFFERED=1"]
