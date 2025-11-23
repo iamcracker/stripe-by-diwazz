@@ -83,6 +83,11 @@ def get_bin_info(bin_number):
     except Exception:
         return {}
 
+# --- Health check endpoint for Wasmer ---
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({"status": "ok", "message": "Stripe Checker API is running"}), 200
+
 # --- NEW API ENDPOINT using GET with URL parameters ---
 @app.route('/check', methods=['GET'])
 def check_card_endpoint():
