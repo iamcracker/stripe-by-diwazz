@@ -3,6 +3,5 @@ kind: wasmer.io/App.v0
 name: stripe-checker-v2
 package: .
 cli_args:
-  - python
   - start.py
 
