@@ -1,5 +1,5 @@
 [package]
-name = "stripe-by-diwazz"
+name = "stripe-checker-v2"
 version = "0.1.0"
 description = "Stripe card checker API"
 
